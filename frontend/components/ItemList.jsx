@@ -1,0 +1,136 @@
+import React, { useEffect, useState } from "react";
+import {
+  Box,
+  List,
+  ListItem,
+  Button,
+  Text,
+  Spinner,
+  Flex,
+} from "@chakra-ui/react";
+import axios from "axios";
+import { toast } from "react-toastify";
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api";
+
+
+const ItemList = ({ categoryId, refreshToggle, onEdit }) => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchItems();
+  }, [refreshToggle, categoryId]);
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const url = categoryId
+        ? `${API_BASE_URL}/items/category/${categoryId}`
+        : `${API_BASE_URL}/items`;
+      const res = await axios.get(url);
+      setItems(res.data);
+    } catch {
+      toast.error("Failed to fetch items");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyPassword = async () => {
+    const entered = window.prompt("Enter admin password:");
+    if (!entered) return false;
+
+    const trimmedPassword = entered.trim();
+    if (!trimmedPassword) {
+      alert("Password required.");
+      return false;
+    }
+
+    try {
+      const res = await axios.post(`${API_BASE_URL}/verify-admin`, {
+        password: trimmedPassword,
+      });
+      if (res.data.success) {
+        return true;
+      } else {
+        alert("Incorrect password. Action cancelled.");
+        return false;
+      }
+    } catch (error) {
+      alert(
+        error.response?.data?.message ||
+          "Verification failed. Please try again later."
+      );
+      return false;
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!(await verifyPassword())) return;
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      try {
+        await axios.delete(`${API_BASE_URL}/items/${id}`);
+        fetchItems();
+        toast.success("Item deleted!");
+      } catch {
+        toast.error("Failed to delete item");
+      }
+    }
+  };
+
+  const handleEdit = async (item) => {
+    if (!(await verifyPassword())) return;
+    onEdit(item);
+  };
+
+  return (
+    <Box borderWidth="1px" borderRadius="md" p={4}>
+      <Text fontSize="xl" mb={4}>
+        Items {categoryId ? `(Category ${categoryId})` : ""}
+      </Text>
+
+      {loading ? (
+        <Flex justify="center">
+          <Spinner />
+        </Flex>
+      ) : (
+        <List spacing={3}>
+          {items.map((item) => (
+            <ListItem
+              key={item.id}
+              display="flex"
+              alignItems="center"
+              justifyContent="space-between"
+              gap={4} // add some gap between image and text
+            >
+              <Text flex="1">
+                {item.name} - {item.description} - Qty: {item.quantity} - ₹
+                {item.price}
+              </Text>
+              <Box>
+                <Button
+                  size="sm"
+                  onClick={() => handleEdit(item)}
+                  mr={2}
+                  colorScheme="blue"
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleDelete(item.id)}
+                  colorScheme="red"
+                >
+                  Delete
+                </Button>
+              </Box>
+            </ListItem>
+          ))}
+        </List>
+      )}
+    </Box>
+  );
+};
+
+export default ItemList;
